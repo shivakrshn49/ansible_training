@@ -1,0 +1,18 @@
+- hosts: linux
+  become: yes
+  tasks:
+  - name: create fact directory
+    file:
+      path=/etc/ansible/facts.d
+      recurse=yes
+      state=directory
+  - name: load the custom fact file
+    template:
+      src=/root/playbooks/datetime.sh
+      dest=/etc/ansible/facts.d/date_time.fact
+      mode=0755
+  - name: reload ansible fact
+    setup: filter=ansible_local
+  - name: print local fact
+    debug:
+      msg: " custom fact is {{ ansible_local.date_time }}"

@@ -1,0 +1,7 @@
+- hosts: linux
+  vars:
+    test: welcome to anible training
+  tasks:
+  - name: print variable
+    debug:
+      msg: "{{ test }}"

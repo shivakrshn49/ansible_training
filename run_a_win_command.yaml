@@ -1,0 +1,11 @@
+- hosts: win
+  tasks:
+  - name: Execute a command on windows
+    win_command: whoami
+    register: whoamioutput
+  - debug: msg="{{whoamioutput.stdout}}" 
+  - debug: msg="{{whoamioutput.stderr}}"
+  - name: Execute Shell Commands
+    win_shell: echo $env:Computername
+    register: shelloutput
+  - debug: msg="{{shelloutput.stdout}}"

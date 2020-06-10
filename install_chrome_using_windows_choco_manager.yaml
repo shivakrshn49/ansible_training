@@ -1,0 +1,6 @@
+- hosts: win
+  tasks:
+  - name: Install Goodle Chrome
+    win_chocolatey:
+      name: googlechrome
+      state: present

@@ -1,0 +1,6 @@
+- hosts: win
+  tasks:
+  - name: start and stop service
+    win_service:
+      name: "Plug and Play"
+      state: restarted
