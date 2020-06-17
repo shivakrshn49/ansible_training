@@ -1,0 +1,659 @@
+IAM User:
+shivakrishnabavandla
+
+
+EC2 instance IP 18.220.110.156
+
+username = centos
+
+[root@ip-172-31-29-39 centos]#
+
+Commands
+---------
+hostnamectl set-hostname shivakrishna-bavandla-contoller.<company_name>.com
+exec bash
+
+useradd -m ansible   
+useradd ansible
+usermod -a -G wheel ansible
+
+sudo su
+su ansible -
+
+vim /etc/ansible/ansible.cfg
+echo > /etc/ansible/hosts
+
+ssh-keygen
+cd ~ => Go to root directory of ansible
+
+ansible all -a "ls -altr"
+ansible all -a uptime
+ansible all -b -a reboot
+ansible all -m setup
+
+ansible tag_centosnode_ansible_yes_value -m ping
+ansible tag_ubuntu_ansible_yes_value -m ping
+
+    Commands Format
+    -----------
+    ansible <tag_or_group_name> -m <module_name>
+    ansible <tag_or_group_name> -a <Command_to_be_executed_on_node_machine>
+    ansible <tag_or_group_name> -b -a <Command_to_be_executed_on_node_machine> ==> -b is becoming super user 
+        (You can find these settings in /etc/ansible/ansible.cfg like what user should be used on the node to login and what user you need to use to execute commands etc.,)
+
+sudo su
+pwd
+
+sudo su -
+pwd
+
+sudo -i
+pwd
+
+Run a playbook
+--------------
+    ansible-playbook createfile.yaml
+    
+    Format
+    -----
+        ansible-playbook <play-book-file>.yaml
+
+
+Ansible yaml Format
+--------------------
+---
+- hosts: all
+  tasks:
+  - name: Create File
+    file:
+      path: /home/ansible/testfile
+      state: touch
+  - name: Create Another File
+    file:
+      path: /home/ansible/testfile2
+      state: touch
+
+  - name: Create a directory
+    file:
+      path: /home/ansible/test_directory_1
+      state: directory
+
+Windows login
+--------
+Public DNS	ec2-3-16-13-224.us-east-2.compute.amazonaws.com
+User name	Administrator
+Password	
+XXXXXXXXXXXXXXXX
+
+Install WinRM in windows remote desktop
+----------------------------------
+$url = "https://raw.githubusercontent.com/ansible/ansible/devel/examples/scripts/ConfigureRemotingForAnsible.ps1"
+$file = "$env:temp\ConfigureRemotingForAnsible.ps1"
+(New-Object -TypeName System.Net.WebClient).DownloadFile($url, $file)
+powershell.exe -ExecutionPolicy ByPass -File $file
+
+Create a directory
+---
+- hosts: win
+  tasks:
+  - name: create directory
+    win_file:
+      path: 'c:\temp'
+      state: directory
+
+Download and install apache
+---
+- hosts: win
+  tasks:
+  - name: download apache
+    win_get_url:
+      url: https://archive.apache.org/dist/httpd/binaries/win32/httpd-2.2.25-win32-x86-no_ssl.msi
+      dest: c:\temp\httpd-2.2.25-win32-x86-no_ssl.msi
+  - name: Install MSI
+    win_package:
+      path: c:\temp\httpd-2.2.25-win32-x86-no_ssl.msi
+      state: present
+
+install google Chrome
+- hosts: win
+  tasks:
+  - name: Install Google Chrome
+    win_chocolatey:
+      name: googlechrome
+      state: present
+
+restart windows service
+- hosts: win
+  tasks:
+  - name: start and stop service
+    win_service:
+      name: "Plug and Play"
+      state: started
+
+Excute a command inside windows
+- hosts: win
+  tasks:
+  - name: Execute a command on windows
+    win_command: whoami
+    register: whoamioutput
+  - debug: msg="{{whoamioutput.stdout}}"
+  - debug: msg="{{whoamioutput.stderr}}"
+  - name: Execute Shell Commands
+    win_shell: echo $env:Computername
+    register: shelloutput
+  - debug: msg="{{shelloutput.stdout}}"
+
+Install apache on different machines
+- hosts: linux
+  become: yes
+  tasks:
+  - name: install apache on ubuntu
+    apt: name=apache2 update_cache=yes state=latest
+    when: ansible_os_family == "Debian"
+  - name: start apache on ubuntu
+    service: name=apache2 enabled=yes state=started
+    when: ansible_os_family == "Debian"
+  - name: install apache on centos
+    yum: name=httpd update_cache=yes state=latest
+    when: ansible_os_family == "RedHat"
+  - name: start apache on centos
+    service: name=httpd enabled=yes state=started
+    when: ansible_os_family == "RedHat"
+  - name: Create index.html
+    template:
+      src: /root/playbooks/index.html
+      dest: /var/www/html/index.html
+
+Looping in ansible
+- hosts: linux
+  become: yes
+  tasks:
+  - name: create multipole directory
+    file:
+      path: "{{ item }}"
+      state: directory
+      mode: 0755
+      owner: ansible
+      group: root
+    with_items:
+    - /home/ansible/folder1
+    - /home/ansible/folder2
+    - /home/ansible/folder3
+
+- hosts: centos
+  tasks:
+  - name: print some value
+    debug: msg=" ansible {{ item[0] }} on day {{ item [1] }} is {{ item[2] }}"
+    with_nested:
+    - [ 'training', 'lab', 'handson' ]
+    - [ 1, 2, 3 ]
+    - [ 'good', 'bad', 'great' ]
+
+ansible ubuntu -m setup | grep os_family
+
+[root@controller playbook]# cat register.yaml
+- hosts: linux
+  ignore_errors: yes
+  tasks:
+  - name: print command output
+    command: ls -l test.txt
+    register: output
+  - debug: msg="standard output={{output.stdout}}"
+  - debug: msg="standard error={{output.stderr}}"
+
+Display a custom message
+------------
+[root@controller playbook]# cat custommessage.yaml
+- hosts: linux
+  tasks:
+  - name: print file content
+    command: cat testfile
+    register: filecontent
+  - debug: msg="File is empty"
+    when: filecontent.stdout==""
+  - debug: msg="File is not empty"
+    when: filecontent.stdout!=""
+
+
+ansible centos -m copy -a "src=/etc/ansible/hosts dest=testfile"
+
+ansible-playbook custommessage.yaml
+
+Add an inline file - Copy a sh file on to the node, replace its contents and execute it.
+-------------
+- hosts: linux
+  tasks:
+  - name: upload the file to target server
+    copy:
+      src: /root/playbook/program.sh
+      dest: /home/ansible/program.sh
+      mode: 0755
+  - name: modify the script
+    lineinfile:
+      dest: /home/ansible/program.sh
+      regexp: '^HOST='
+      line: HOST={{ ansible_hostname }}
+      state: present
+  - name: run the script
+    shell: /home/ansible/program.sh
+    register: output
+  - debug: msg=" output is {{ output.stdout}}"
+
+Install Mariadb and start it
+--------------------------
+[root@controller playbook]# cat mariadb.yaml
+- hosts: centos
+  become: yes
+  tasks:
+  - name: install mariadb server
+    yum:
+      name=mariadb-server
+      state=latest
+    tags:
+    - install
+  - name: start mariadb
+    service:
+      name=mariadb
+      state=started
+    tags:
+    - start
+
+    Run a specific tag from the playbook
+    ----------------------
+    ansible-playbook mariadb.yaml --tags "start"
+    ansible-playbook mariadb.yaml --skip-tags "start,install"
+
+    Stop a maria db server with ansible
+    -------------
+    ansible centos -b -a "systemctl stop mariadb"
+
+Multiple tags
+-----------
+- hosts: centos
+  become: yes
+  tasks:
+  - name: install mariadb server
+    yum:
+      name=mariadb-server
+      state=latest
+    tags:
+    - install
+    - all
+  - name: start mariadb
+    service:
+      name=mariadb
+      state=started
+    tags:
+    - start
+    - all
+  - name: create user
+    user:
+      name: taguser
+    tags:
+    - all
+
+Variable replacement
+--------------
+- hosts: linux
+  vars:
+    test: welcome to anible training
+  tasks:
+  - name: print variable
+    debug:
+      msg: "{{ test }}"
+   =============
+- hosts: linux
+  vars:
+    test: welcome to anible training
+    Test: welcome
+  tasks:
+  - name: print variable
+    debug:
+      msg: "{{ test }}"
+  - name: print another variable
+    debug:
+      msg: "{{ Test }}"
+
+Display variable options
+--------------
+- hosts: linux
+  vars:
+    teams:
+      - csk
+      - rcb
+      - mi
+      - srh
+  tasks:
+  - name: print list variables
+    debug:
+      msg: "{{ teams [0] }}"
+////////////
+- hosts: linux
+  vars:
+    teams:
+      - csk
+      - rcb
+      - mi
+      - srh
+  tasks:
+  - name: print list variables
+    debug:
+      msg: "{{ item }}"
+    with_items:
+      - "{{ teams }}"
+////////////
+- hosts: linux
+  vars:
+    teams: [csk, rcb, mi, srh]
+  tasks:
+  - name: print list variables
+    debug:
+      msg: "{{ item }}"
+    with_items:
+      - "{{ teams }}"
+
+////////////////
+Variables in the form of dict
+
+- hosts: linux
+  vars:
+    training:
+      topic: ansible
+      trainer: sathish
+      labs: aws
+  tasks:
+  - name: print dict varaiable
+    debug:
+      msg: "{{ training['topic'] }}"
+  - name: print in another way
+    debug:
+      msg: "{{ training.topic }}"
+//////////////
+Using python dict.item style
+- hosts: linux
+  vars:
+    training:
+      topic: ansible
+      trainer: sathish
+      labs: aws
+  tasks:
+  - name: print dict varaiable
+    debug:
+      msg: "key is {{ item.key }} and value is {{ item.value }}"
+    with_dict: "{{ training }}"
+////////
+Replace the host variable in playbook from /etc/ansible/hosts - Inventory
+- hosts: linux
+  tasks:
+  - name: print host variable
+    debug:
+      msg: " http port is {{ portnumber }}"
+////////////
+Create / add a user on the nodes
+[root@controller playbook]# cat useradd.yaml
+- hosts: linux
+  become: yes
+  tasks:
+  - name: create user
+    user:
+      name: "{{ username }}"
+      state: present
+      shell: /bin/bash
+
+ansible-playbook useradd.yaml --extra-vars "username=testuser"
+ansible linux -a "tail /etc/passwd"
+
+- hosts: linux
+  become: yes
+  tasks:
+  - name: create user
+    user:
+      name: "{{ username }}"
+      state: present
+      shell: "{{ shell }}"
+
+ansible-playbook useradd.yaml --extra-vars "username=testuser" --extra-vars "shell=/bin/sh"
+ansible linux -a "tail /etc/passwd"
+
+Multiple vars in a single command under ""
+    ansible-playbook useradd.yaml --extra-vars "username=testuser shell=/bin/bash"
+///////////////////
+[root@controller playbook]# cat customfact.yaml
+- hosts: linux
+  become: yes
+  tasks:
+  - name: create fact directory
+    file:
+      path=/etc/ansible/facts.d
+      recurse=yes
+      state=directory
+  - name: load the custom fact file
+    template:
+      src=/root/playbook/datetime.sh.j2
+      dest=/etc/ansible/facts.d/date_time.fact
+      mode=0755
+  - name: reload ansible fact
+    setup: filter=ansible_local
+  - name: print local fact
+    debug:
+      msg: " custom fact is {{ ansible_local.date_time }}"
+
+ansible-playbook customfact.yaml
+ansible linux -m setup -a "filter=ansible_local"
+
+Create a Vault 
+-------------------
+ansible-vault create sensitive.yaml
+
+
+- hosts: linux
+  tasks:
+  - name: create sensitive file
+    copy:
+      content="this file contained sesnitive informatin"
+      dest=/home/ansible/sensitive.txt
+
+cat sensitive.yaml
+
+[root@controller playbook]# ansible-playbook sensitive.yaml
+ERROR! Attempting to decrypt but no vault secrets found
+
+ansible-playbook sensitive.yaml --ask-vault-pass
+ansible linux -a "cat sensitive.txt"
+
+ansible-vault view sensitive.yaml
+ansible-vault edit sensitive.yaml
+
+[root@controller playbook]# ansible-vault decrypt sensitive.yaml
+Vault password:
+Decryption successful
+[root@controller playbook]# cat sensitive.yaml
+- hosts: linux
+  tasks:
+  - name: create sensitive file
+    copy:
+      content="this file contained sesnitive informatin"
+      dest=/home/ansible/sensitive.txt
+[root@controller playbook]#
+
+
+Create a role called apache at /etc/ansible/roles
+----------
+ansible-galaxy init apache --offline
+
+
+cd ..
+vi files/index.html
+    Home page for apache using role
+vi handlers/main.yml (edited)
+    ---
+    # handlers file for apache
+    - name: restart apache
+    service: name=httpd state=restarted
+
+mkdir roles
+mv apache roles/
+
+[root@controller playbook]# cat apacherole.yaml
+- hosts: centos
+  become: yes
+  roles:
+  - apache
+
+Install Ansible and docker on controller
+------------------------------------------
+yum install -y epel-release
+yum groups install "Development Tools"
+yum install -y jq python2-pip yum-utils device-mapper-persistent-data lvm2
+yum update
+yum-config-manager --add-repo https://download.docker.com/linux/centos/docker-ce.repo
+yum -y install docker-ce
+systemctl enable docker && systemctl start docker
+LATEST_VERSION=$(curl -s https://api.github.com/repos/docker/compose/releases/latest | jq -r '.tag_name')
+curl -L "https://github.com/docker/compose/releases/download/$LATEST_VERSION/docker-compose-$(uname -s)-$(uname -m)" > /usr/local/bin/docker-compose
+chmod +x /usr/local/bin/docker-compose
+yum install python-devel
+pip install --upgrade pip
+pip install ansible
+pip install wheel
+pip install docker-compose --ignore-installed
+cd ~
+curl -L -o ansible-awx-11.0.0.tar.gz https://github.com/ansible/awx/archive/11.0.0.tar.gz
+tar xvfz ansible-awx-11.0.0.tar.gz
+rm -f ansible-awx-11.0.0.tar.gz
+cd awx-11.0.0/
+sed -i "s|^dockerhub_base=ansible|#dockerhub_base=ansible|g" installer/inventory
+mkdir -p /opt/awx-psql-data
+sed -i "s|^postgres_data_dir.*|postgres_data_dir=/opt/awx-psql-data|g" installer/inventory
+mkdir -p /etc/awx-ssl/
+openssl req -subj '/CN=secops.tech/O=Secops Tech/C=TR' -new -newkey rsa:2048 -sha256 -days 1365 -nodes -x509 -keyout /etc/awx-ssl/awx.key -out /etc/awx-ssl//awx.crt
+cat /etc/awx-ssl/awx.key /etc/awx-ssl/awx.crt > /etc/awx-ssl/awx-bundled-key.crt
+sed -i -E "s|^#([[:space:]]?)ssl_certificate=|ssl_certificate=/etc/awx-ssl/awx-bundled-key.crt|g" installer/inventory
+curl -L -o awx-logos.tar.gz https://github.com/ansible/awx-logos/archive/master.tar.gz
+tar xvfz awx-logos.tar.gz
+mv awx-logos-master awx-logos
+rm -f *awx*.tar.gz
+cd awx-11.0.0/
+sed -i -E "s|^#([[:space:]]?)awx_official=false|awx_official=true|g" installer/inventory
+sed -i "s|^admin_user=.*|admin_user=awx-admin|g" installer/inventory
+sed -i "s|^admin_password=.*|admin_password=CHANGE_ME|g" installer/inventory
+cd installer
+
+
+Spin up a docker container and test the infrastrcure using ansible 
+=============================================
+sudo su
+cd ~
+cd playbook/roles/
+yum update -y
+yum install -y epel-release
+yum groups install "Development Tools"
+yum install -y python-devel python2-pip docker-ce ansible
+systemctl start docker
+systemctl enable docker
+pip install --upgrade pip
+pip install -U setuptools
+pip install wheel
+pip install pytest
+pip install pytest-xdist
+pip install testinfra
+pip install molecule docker --ignore-installed
+molecule init role --driver-name docker --verifier-name testinfra ansible-role-redis
+cd ansible-role-redis
+molecule test
+
+//////////////////////////////////////
+cat molecule/default/molecule.yml
+
+---
+dependency:
+  name: galaxy
+driver:
+  name: docker
+platforms:
+  - name: centos7
+    image: "percygrunwald/docker-centos7-ansible:latest"
+    command: ""
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+    privileged: true
+    pre_build_image: true
+  - name: ubuntu1804
+    image: "percygrunwald/docker-ubuntu1804-ansible:latest"
+    command: ""
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+    privileged: true
+    pre_build_image: true
+  - name: debian9
+    image: "percygrunwald/docker-debian9-ansible:latest"
+    command: ""
+    volumes:
+      - /sys/fs/cgroup:/sys/fs/cgroup:ro
+    privileged: true
+    pre_build_image: true
+provisioner:
+  name: ansible
+verifier:
+  name: testinfra
+
+////////////////
+---
+# tasks file for ansible-role-redis
+- name: install redis on RedHat-based distros
+  block:
+    - name: ensure epel repo is installed (RedHat)
+      yum:
+        name: epel-release
+        state: present
+        update_cache: true
+    - name: ensure redis is installed (RedHat)
+      yum:
+        name: redis
+        state: present
+        update_cache: true
+  when: ansible_os_family == 'RedHat'
+- name: install redis on Debian-based distros
+  block:
+    - name: ensure redis is installed (Debian)
+      apt:
+        name: redis-server
+        state: present
+        update_cache: true
+    - name: disable ipv6 binding (Debian)
+      lineinfile:
+        path: /etc/redis/redis.conf
+        regex: '^bind'
+        line: bind 127.0.0.1
+  when: ansible_os_family == 'Debian'
+- name: ensure redis service is started and enabled
+  service:
+    name: redis
+    state: started
+    enabled: true
+
+////// Modify the test case
+vi molecule/default/tests/test_default.py
+
+"""Role testing files using testinfra."""
+def test_hosts_file(host):
+    """Validate /etc/hosts file."""
+    f = host.file("/etc/hosts")
+    assert f.exists
+    assert f.user == "root"
+    assert f.group == "root"
+def test_redis_installed(host):
+    redis_package_name = _get_redis_package_name(host.system_info.distribution)
+    redis_package = host.package(redis_package_name)
+    assert redis_package.is_installed
+def test_redis_service_started_enabled(host):
+    redis_service_name = _get_redis_package_name(host.system_info.distribution)
+    redis_service = host.service(redis_service_name)
+    assert redis_service.is_running
+    assert redis_service.is_enabled
+def _get_redis_package_name(host_distro):
+    return {
+        "ubuntu": "redis-server",
+        "debian": "redis-server",
+        "centos": "redis"
+    }.get(host_distro, "redis")
